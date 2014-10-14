@@ -55,13 +55,14 @@
 		_tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dismiss:)];
 		[_tapGestureRecognizer setNumberOfTapsRequired:1];
 		
+        
 		_backgroundView = [[UIView alloc] initWithFrame:frame];
 		_backgroundView.backgroundColor = [UIColor clearColor];
 		_backgroundView.userInteractionEnabled = YES;
 		_backgroundView.multipleTouchEnabled = NO;
+        _backgroundView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 		[_backgroundView addGestureRecognizer:_tapGestureRecognizer];
 		[self.view addSubview:_backgroundView];
-		
 	}
 	
 	return self;
@@ -83,6 +84,7 @@
 
 - (void)addAlertView:(DLAVAlertView *)alertView {
 	if (!self.alertViews.count) {
+        self.alertWindow.rootViewController = self;
 		self.alertWindow.hidden = NO;
 		[self.alertWindow addSubview:self.view];
 		[self.alertWindow makeKeyAndVisible];
@@ -97,8 +99,12 @@
 		}];
 	}
 	
-	[alertView updateFrameWithAnimationOfDuration:0.0];
+    UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+    [self updateFrameWithOrientation:orientation];
+    alertView.center = self.view.center;
 	
+    alertView.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin;
+    
 	[self.alertViews addObject:alertView];
 	[self.view addSubview:alertView];
 	self.currentAlertView = alertView;
@@ -111,6 +117,7 @@
 	
 	if (previousAlertView) {
 		[self.view addSubview:previousAlertView];
+        previousAlertView.center = self.view.center;
 		[previousAlertView unhideWithCompletion:nil];
 	}
 	self.currentAlertView = previousAlertView;
@@ -119,6 +126,7 @@
 		[self hideBackgroundViewWithCompletion:^(BOOL finished) {
 			if (!self.alertViews.count) {
 				self.alertWindow.hidden = YES;
+                self.alertWindow.rootViewController = nil;
 				[[self lastWindowWithLevel:UIWindowLevelNormal] makeKeyAndVisible];
 			}
 		}];
@@ -184,8 +192,7 @@
 - (void)updateFrameWithOrientation:(UIInterfaceOrientation)orientation {
     CGRect frame = [self frameForOrientation:orientation];
     self.view.frame = frame;
-    self.backgroundView.frame = frame;
-    [self.currentAlertView updateFrameWithAnimationOfDuration:0.0];
+    self.currentAlertView.center = self.view.center;
 }
 
 - (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
@@ -218,14 +225,6 @@
 	[super viewWillTransitionToSize: size withTransitionCoordinator: coordinator];
 }
 
-- (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation {
-	return YES;
-}
-
-- (BOOL)shouldAutorotate {
-	return YES;
-}
-
 - (BOOL)prefersStatusBarHidden {
 	return [UIApplication sharedApplication].statusBarHidden;
 }
@@ -234,8 +233,62 @@
 	return [UIApplication sharedApplication].statusBarStyle;
 }
 
+- (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation {
+    UIViewController* topViewController = [self topViewControllerFromTopNormalWindow];
+    if (topViewController) {
+        return [topViewController shouldAutorotateToInterfaceOrientation:interfaceOrientation];
+    }
+    
+    return YES;
+}
+
+-(UIInterfaceOrientation)preferredInterfaceOrientationForPresentation {
+    UIViewController* topViewController = [self topViewControllerFromTopNormalWindow];
+    if (topViewController) {
+        return [topViewController preferredInterfaceOrientationForPresentation];
+    }
+    
+    return [UIApplication sharedApplication].statusBarOrientation;
+}
+
+- (BOOL)shouldAutorotate {
+    UIViewController* topViewController = [self topViewControllerFromTopNormalWindow];
+    if (topViewController) {
+        return [topViewController shouldAutorotate];
+    }
+    
+    return YES;
+}
+
 - (NSUInteger)supportedInterfaceOrientations {
-	return UIInterfaceOrientationMaskAll;
+    UIViewController* topViewController = [self topViewControllerFromTopNormalWindow];
+    if (topViewController) {
+        return [topViewController supportedInterfaceOrientations];
+    }
+    return UIInterfaceOrientationMaskAll;
+}
+
+- (UIViewController*) topViewControllerFromTopNormalWindow {
+    UIWindow* topWindow = [self lastWindowWithLevel:UIWindowLevelNormal];
+    if (topWindow.rootViewController) {
+        return [self topViewControllerWithRootViewController:topWindow.rootViewController];
+    }
+    return nil;
+}
+
+- (UIViewController*)topViewControllerWithRootViewController:(UIViewController*)rootViewController {
+    if ([rootViewController isKindOfClass:[UITabBarController class]]) {
+        UITabBarController* tabBarController = (UITabBarController*)rootViewController;
+        return [self topViewControllerWithRootViewController:tabBarController.selectedViewController];
+    } else if ([rootViewController isKindOfClass:[UINavigationController class]]) {
+        UINavigationController* navigationController = (UINavigationController*)rootViewController;
+        return [self topViewControllerWithRootViewController:navigationController.visibleViewController];
+    } else if (rootViewController.presentedViewController) {
+        UIViewController* presentedViewController = rootViewController.presentedViewController;
+        return [self topViewControllerWithRootViewController:presentedViewController];
+    } else {
+        return rootViewController;
+    }
 }
 
 #pragma mark - Device Orientation

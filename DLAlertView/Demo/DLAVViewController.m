@@ -446,4 +446,16 @@
 	return usecases;
 }
 
+-(NSUInteger)supportedInterfaceOrientations {
+    return UIInterfaceOrientationPortrait;
+}
+
+-(UIInterfaceOrientation)preferredInterfaceOrientationForPresentation {
+    return UIInterfaceOrientationPortrait;
+}
+
+-(BOOL)shouldAutorotate {
+    return NO;
+}
+
 @end
